@@ -1,0 +1,266 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Tracker{% endblock %}</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --sidebar-w: 240px;
+      --sidebar-collapsed-w: 72px;
+      --brand: #6366f1;         /* New refined lavender-indigo */
+      --brand-dark: #4f46e5;
+      --text-light: #f8f9ff;
+      --hover-bg: rgba(255, 255, 255, 0.15);
+      --transition: 0.28s ease;
+      --shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+
+    body {
+      margin: 0;
+      font-family: "Inter", sans-serif;
+      background: #f5f7fb;
+      overflow-x: hidden;
+      transition: background var(--transition);
+    }
+
+    /* ---------------------
+       SIDEBAR
+       --------------------- */
+    .sidebar {
+      width: var(--sidebar-w);
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      background: linear-gradient(180deg, var(--brand), var(--brand-dark));
+      padding: 1.8rem 1rem;
+      box-shadow: var(--shadow);
+      transition: width var(--transition);
+      overflow: visible; /* REQUIRED FOR TOOLTIP */
+      color: var(--text-light);
+      display: flex;
+      flex-direction: column;
+      z-index: 1100;
+    }
+
+    body.sidebar-collapsed .sidebar {
+      width: var(--sidebar-collapsed-w);
+    }
+
+    .sidebar h3 {
+      font-size: 1.45rem;
+      margin-bottom: 2rem;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: 0.4px;
+      transition: opacity var(--transition);
+    }
+    body.sidebar-collapsed .sidebar h3 { opacity: 0; }
+
+    .sidebar .user-label {
+      text-align: center;
+      margin-bottom: 1.8rem;
+      opacity: 0.9;
+      transition: opacity var(--transition);
+    }
+    body.sidebar-collapsed .sidebar .user-label { opacity: 0; }
+
+    /* Links */
+    .sidebar a,
+    .sidebar button.logout-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 6px;
+      background: transparent;
+      border-radius: 10px;
+      white-space: nowrap;
+      color: var(--text-light);
+      text-decoration: none;
+      transition: background var(--transition), padding var(--transition);
+      border: none;
+      font-size: 15px;
+    }
+
+    .sidebar a:hover,
+    .sidebar a.active {
+      background: var(--hover-bg);
+    }
+
+    /* Hide label text when collapsed */
+    body.sidebar-collapsed .sidebar a span,
+    body.sidebar-collapsed .sidebar button span {
+      display: none;
+    }
+
+    /* ----------------------
+       TOOLTIP (Collapsed Mode)
+       ---------------------- */
+
+    body.sidebar-collapsed .sidebar a[data-title]:hover::after,
+    body.sidebar-collapsed .sidebar button[data-title]:hover::after {
+      content: attr(data-title);
+      position: absolute;
+      left: calc(var(--sidebar-collapsed-w) + 14px);
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0,0,0,0.85);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #fff;
+      white-space: nowrap;
+      z-index: 2000;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.28);
+      pointer-events: none;
+    }
+
+    /* Logout */
+    .logout-btn {
+      margin-top: auto;
+      background: #ef4444 !important;
+      font-weight: 500;
+    }
+    .logout-btn:hover {
+      background: #dc2626 !important;
+    }
+
+    /* ---------------------
+       MAIN CONTENT AREA
+       --------------------- */
+    .main-content {
+      margin-left: var(--sidebar-w);
+      padding: 2.2rem;
+      transition: margin-left var(--transition);
+    }
+
+    body.sidebar-collapsed .main-content {
+      margin-left: var(--sidebar-collapsed-w);
+    }
+
+    /* ---------------------
+       HAMBURGER BUTTON
+       --------------------- */
+    #hamburgerBtn {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 10px;
+      background: white;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      cursor: pointer;
+      z-index: 1200;
+      transition: background 0.25s;
+    }
+    #hamburgerBtn:hover {
+      background: #f0f0f0;
+    }
+
+    /* Mobile behavior */
+    @media (max-width: 900px) {
+      body.sidebar-collapsed .sidebar {
+        transform: translateX(-100%);
+      }
+      body.sidebar-collapsed .main-content {
+        margin-left: 0;
+      }
+    }
+  </style>
+
+  {% block extra_head %}{% endblock %}
+</head>
+
+<body class="sidebar-collapsed">
+
+<!-- HAMBURGER -->
+<button id="hamburgerBtn">☰</button>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <h3> Tracker</h3>
+
+  <p class="user-label">👋 {{ request.user.username }}</p>
+
+  <a href="{% url 'reports' %}" data-title="Reports" class="{% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
+    📊 <span>Reports</span>
+  </a>
+
+  <a href="{% url 'manage_issues' %}" data-title="Manage Issues" class="{% if request.resolver_match.url_name == 'manage_issues' %}active{% endif %}">
+    ⚙️ <span>Manage Issues</span>
+  </a>
+
+  <a href="{% url 'due_today' %}" data-title="Due Today" class="{% if request.resolver_match.url_name == 'due_today' %}active{% endif %}">
+    ⏰ <span>Due Today</span>
+  </a>
+
+  <a href="{% url 'dashboard_closed' %}" data-title="Closed Issues" class="{% if request.resolver_match.url_name == 'dashboard_closed' %}active{% endif %}">
+    ✅ <span>Closed Issues</span>
+  </a>
+
+  <hr style="border-color: rgba(255,255,255,0.25); margin: 1rem 0;">
+
+  <form action="{% url 'logout' %}" method="post">
+    {% csrf_token %}
+    <button type="submit" class="logout-btn" data-title="Logout">
+      🚪 <span>Logout</span>
+    </button>
+  </form>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main-content">
+  {% block content %}{% endblock %}
+</div>
+
+<script>
+  const body = document.body;
+  const sidebar = document.querySelector(".sidebar");
+  const hamburgerBtn = document.getElementById("hamburgerBtn");
+
+  // Toggle sidebar
+  hamburgerBtn.addEventListener("click", () => {
+    body.classList.toggle("sidebar-collapsed");
+  });
+
+  // Hover expand (desktop only)
+  sidebar.addEventListener("mouseenter", () => {
+    if (window.innerWidth > 900) body.classList.remove("sidebar-collapsed");
+  });
+  sidebar.addEventListener("mouseleave", () => {
+    if (window.innerWidth > 900) body.classList.add("sidebar-collapsed");
+  });
+
+  // Keyboard toggle
+  document.addEventListener("keydown", e => {
+    if (e.key.toLowerCase() === "m") {
+      body.classList.toggle("sidebar-collapsed");
+    }
+  });
+</script>
+<footer class="app-footer text-center">
+  <div>
+    <span>⚡ Powered by <strong>Nisamudheen</strong></span>
+  </div>
+  <div class="mt-1">
+    <a href="mailto:nisamac2121@gmail.com" class="footer-link">
+      📧 Contact: <strong>nisamac2121@gmail.com</strong>
+    </a>
+  </div>
+</footer>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

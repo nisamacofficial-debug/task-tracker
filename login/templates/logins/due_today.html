@@ -1,0 +1,207 @@
+{% extends "logins/base.html" %}
+{% load static %}
+
+{% block title %}Due Today — Task Tracker{% endblock %}
+
+{% block extra_head %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+
+  <style>
+    /* Specific styles for Due Today page */
+    .info-card {
+      background: white;
+      border-radius: 12px;
+      position: relative;
+    }
+
+    .infobar {
+      width: 14px;
+      height: 40px;
+      border-radius: 6px;
+    }
+
+    /* FIX TABLE LAYOUT ISSUE */
+    table {
+      display: table !important;
+      width: 100% !important;
+    }
+    table tr { display: table-row !important; }
+    table td, table th { display: table-cell !important; }
+
+    .issues-table {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      overflow: hidden;
+    }
+    .issues-table th {
+      background-color: #667eea;
+      color: white;
+    }
+    .issues-table h4 {
+      background-color: #f8f9fa; /* Light background for the sub-heading inside the table container */
+      border-bottom: 1px solid #eee;
+    }
+
+    /* Overriding base styles for card appearance */
+    .card {
+        padding: 0;
+        box-shadow: none; /* Rely on issues-table shadow */
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <h3 class="mb-4">Due Today</h3>
+
+  <div class="row g-4 mb-5">
+
+    <div class="col-md-3 col-sm-6">
+      <div class="info-card p-3 shadow-sm rounded">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-1">{{ count_due_today }}</h5>
+            <small class="text-muted">Due Today</small>
+          </div>
+          <div class="infobar bg-primary"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+      <div class="info-card p-3 shadow-sm rounded">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-1">{{ count_due_tomorrow }}</h5>
+            <small class="text-muted">Due Tomorrow</small>
+          </div>
+          <div class="infobar bg-warning"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+      <div class="info-card p-3 shadow-sm rounded">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-1">{{ count_due_all }}</h5>
+            <small class="text-muted">All Due</small>
+          </div>
+          <div class="infobar bg-secondary"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="issues-table mb-5">
+    <h4 class="p-3 m-0">Due Today Issues</h4>
+    <table class="table table-striped mb-0">
+      <thead>
+        <tr>
+          <th>ID</th><th>Title</th><th>Description</th><th>Status</th>
+          <th>Due Date</th><th>Created By</th><th>Created At</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for issue in due_today_issues %}
+        <tr>
+          <td>{{ issue.id }}</td>
+          <td>{{ issue.title }}</td>
+          <td>{{ issue.description|truncatechars:80 }}</td>
+          <td>
+            {% if issue.status == "closed" %}
+              <span class="badge bg-success">Closed</span>
+            {% elif issue.status == "in_progress" %}
+              <span class="badge bg-warning text-dark">In Progress</span>
+            {% else %}
+              <span class="badge bg-secondary">Open</span>
+            {% endif %}
+          </td>
+          <td>{{ issue.due_date|date:"Y-m-d" }}</td>
+          <td>{{ issue.created_by.username }}</td>
+          <td>{{ issue.created_at|date:"Y-m-d H:i" }}</td>
+          <td>
+            <a href="{% url 'edit_issue' issue.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+            <button class="btn btn-sm btn-outline-danger delete-issue" data-id="{{ issue.id }}">Delete</button>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="8" class="text-center py-4">No issues due today 🎉</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="issues-table mt-4">
+    <h4 class="p-3 m-0">All Due Issues</h4>
+    <table class="table table-striped mb-0">
+      <thead>
+        <tr>
+          <th>ID</th><th>Title</th><th>Description</th><th>Status</th>
+          <th>Due Date</th><th>Created By</th><th>Created At</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for issue in all_due_issues %}
+        <tr>
+          <td>{{ issue.id }}</td>
+          <td>{{ issue.title }}</td>
+          <td>{{ issue.description|truncatechars:80 }}</td>
+          <td>
+            {% if issue.status == "closed" %}
+              <span class="badge bg-success">Closed</span>
+            {% elif issue.status == "in_progress" %}
+              <span class="badge bg-warning text-dark">In Progress</span>
+            {% else %}
+              <span class="badge bg-secondary">Open</span>
+            {% endif %}
+          </td>
+          <td>{{ issue.due_date|date:"Y-m-d" }}</td>
+          <td>{{ issue.created_by.username }}</td>
+          <td>{{ issue.created_at|date:"Y-m-d H:i" }}</td>
+          <td>
+            <a href="{% url 'edit_issue' issue.id %}" class="btn btn-sm btn-outline-primary">Edit</a>
+            <button class="btn btn-sm btn-outline-danger delete-issue" data-id="{{ issue.id }}">Delete</button>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="8" class="text-center py-4">No due issues found</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock content %}
+
+{% block extra_js %}
+  <script>
+    // NOTE: The sparkline logic is retained but will fail if the counts are not integers (Django template output is string).
+    // The original script attempts to calculate a sparkline; however, since no <canvas> elements with IDs 'spark_today' or 'spark_tomorrow' are present in the HTML, this code is currently non-functional/harmless.
+    // If you plan to add sparklines, you'll need to update the HTML structure to include the canvas elements and ensure your Django context passes the counts as numbers/strings that can be parsed.
+
+    // const todayCount = Number({{ count_due_today|default:0 }});
+    // const tomorrowCount = Number({{ count_due_tomorrow|default:0 }});
+
+    // function spark(id, value, color) {
+    //   const ctx = document.getElementById(id);
+    //   if (!ctx) return; // Add check since canvas is missing
+    //   new Chart(ctx, {
+    //     type: "bar",
+    //     data: { labels: [1,2,3,4,5], datasets: [{ data: [value-1,value,value,value-2,value+1], backgroundColor: color }]},
+    //     options: { plugins: { legend: { display:false }}, scales:{x:{display:false},y:{display:false}} }
+    //   });
+    // }
+    // spark("spark_today", todayCount, "#667eea");
+    // spark("spark_tomorrow", tomorrowCount, "#f59e0b");
+
+    // Placeholder for delete functionality (requires server endpoint)
+    // function getCookie(name) { ... } // Re-implement helper if needed for actual delete
+    // document.addEventListener('click', function (e) {
+    //     const delBtn = e.target.closest('.delete-issue');
+    //     if (!delBtn) return;
+    //     const issueId = delBtn.getAttribute('data-id');
+    //     if (!confirm('Are you sure you want to delete issue #' + issueId + '?')) return;
+    //     // Add AJAX delete logic here
+    // });
+  </script>
+{% endblock extra_js %}

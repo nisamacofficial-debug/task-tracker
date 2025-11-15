@@ -1,0 +1,127 @@
+{% extends "logins/base.html" %}
+{% load static %}
+
+{% block title %}Edit Issue{% endblock %}
+
+{% block extra_head %}
+<style>
+  .main-content {
+    flex-grow: 1;
+    padding: 2rem;
+  }
+
+  .card {
+    border: none;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border-radius: 12px;
+  }
+
+  .btn-save {
+    background-color: #667eea;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+  }
+  .btn-save:hover {
+    background-color: #5465d1;
+  }
+
+  /* Uploaded file list */
+  .file-box {
+    background: #f7f7ff;
+    border: 1px solid #e0e0f0;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+  .file-title {
+    font-weight: 600;
+    color: #4a4a8a;
+  }
+  .file-meta {
+    font-size: 12px;
+    color: #666;
+  }
+
+</style>
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4 fw-semibold">✏️ Edit Issue #{{ issue.id }}</h2>
+
+<div class="card p-4">
+  <form method="POST" enctype="multipart/form-data" action="{% url 'edit_issue' issue.id %}">
+    {% csrf_token %}
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Title</label>
+      <input type="text" name="title" class="form-control" value="{{ issue.title }}" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Description</label>
+      <textarea name="description" class="form-control" rows="4" required>{{ issue.description }}</textarea>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Status</label>
+      <select name="status" class="form-select">
+        <option value="open" {% if issue.status == 'open' %}selected{% endif %}>Open</option>
+        <option value="in_progress" {% if issue.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+        <option value="closed" {% if issue.status == 'closed' %}selected{% endif %}>Closed</option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Due Date</label>
+      <input type="date" name="due_date" class="form-control" value="{{ issue.due_date|date:'Y-m-d' }}">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Tags</label>
+      <input type="text" name="tags" class="form-control" value="{{ issue.tag }}">
+      <div class="form-text">Enter comma-separated tags (e.g., Bug,UI,Backend)</div>
+    </div>
+
+    <!-- Uploaded Documents Viewer -->
+    <div class="mb-3 mt-4">
+      <label class="form-label fw-semibold">Uploaded Documents</label>
+
+      {% if issue.documents.all %}
+        {% for doc in issue.documents.all %}
+          <div class="file-box">
+            <div class="file-title">
+              📄 <a href="{{ doc.file.url }}" download>{{ doc.file.name|slice:"12:" }}</a>
+            </div>
+            <div class="file-meta">
+              Uploaded: {{ doc.uploaded_at|date:"Y-m-d H:i" }}<br>
+              Size: {{ doc.file.size|filesizeformat }}
+            </div>
+          </div>
+        {% empty %}
+          <p class="text-muted">No files uploaded.</p>
+        {% endfor %}
+      {% endif %}
+    </div>
+
+    <!-- Option to upload new documents -->
+    <div class="mb-3">
+      <label class="form-label fw-semibold">Upload Additional Documents</label>
+      <input type="file" name="documents" class="form-control" multiple>
+      <small class="text-muted">You can upload more files. Existing ones will remain.</small>
+    </div>
+
+    <div class="d-flex justify-content-between mt-4">
+      <a href="{% url 'manage_issues' %}" class="btn btn-outline-secondary">⬅ Back</a>
+      <button type="submit" class="btn btn-save">💾 Save Changes</button>
+    </div>
+
+  </form>
+</div>
+
+{% endblock content %}
+
+{% block extra_js %}
+{% endblock extra_js %}

@@ -1,0 +1,142 @@
+{% extends "logins/base.html" %}
+{% load static %}
+
+{% block title %}Closed Issues Dashboard{% endblock %}
+
+{% block extra_head %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    /* Global variables (for clarity/consistency, even if defined in the Manage Issues extension) */
+    :root {
+      --brand:#667eea;
+      --panel-bg:#fff;
+    }
+
+    .main-content {
+      flex-grow: 1;
+      padding: 2rem;
+    }
+
+    .info-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    /* Card styling (Original card style, slightly simplified) */
+    .card {
+      background: var(--panel-bg);
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05); /* Original dashboard shadow */
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .card h4 {
+      margin-bottom: 0.5rem;
+      color: #555;
+    }
+
+    .card .count {
+      font-size: 2rem;
+      color: var(--brand);
+      font-weight: bold;
+    }
+
+    /* --- Applying issues-table / card-elev styles to the table container --- */
+    .issues-table-wrap { 
+      background: var(--panel-bg); 
+      border-radius: 12px; 
+      box-shadow: 0 6px 20px rgba(0,0,0,0.04); /* card-elev shadow */
+      padding: 16px; /* card-elev padding (for overall padding around the table) */
+      margin-top: 2rem;
+    }
+
+    /* --- Table styling matching Manage Issues table structure --- */
+    table {
+      width: 100%;
+      background: var(--panel-bg); /* Table background is already inside the wrapper */
+      border-radius: 10px; /* Keep table rounded corners if not inheriting from wrapper */
+      border-collapse: collapse;
+    }
+
+    /* Header styling (matching Manage Issues) */
+    th {
+      background-color: var(--brand);
+      color: white;
+      padding: 12px 16px;
+      text-align: left;
+      /* Remove border-bottom from th */
+      border-bottom: none !important;
+    }
+
+    /* Cell styling */
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+    
+    tr:hover {
+      background-color: #f1f3ff;
+    }
+
+    .chart-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      padding: 1.5rem;
+      margin-top: 2rem;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <h2>✅ Closed Issues Dashboard</h2>
+
+  <div class="info-cards">
+    <div class="card">
+      <h4>Total Closed</h4>
+      <div class="count">{{ total_closed }}</div>
+    </div>
+  </div>
+
+  <div class="issues-table-wrap">
+    <h3 style="margin-top:0.5rem; margin-bottom: 1rem;">Closed Issues</h3>
+    <div style="overflow-x: auto;">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th style="width:60px">ID</th>
+            <th>Title</th>
+            <th>Tag</th>
+            <th style="width:180px">Status</th>
+            <th style="width:160px">Created At</th>
+            <th style="width:160px">Closed At</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for issue in closed_issues %}
+          <tr>
+            <td>{{ issue.id }}</td>
+            <td>{{ issue.title }}</td>
+            <td>{{ issue.tag }}</td>
+            <td>
+              <span class="badge bg-success">{{ issue.status }}</span>
+            </td>
+            <td>{{ issue.created_at|date:"Y-m-d" }}</td>
+            <td>{{ issue.modified_at|date:"Y-m-d" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" style="text-align:center;">No closed issues found</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock content %}
+
+{% block extra_js %}
+  {% endblock extra_js %}

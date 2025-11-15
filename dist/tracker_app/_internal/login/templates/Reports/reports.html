@@ -1,0 +1,227 @@
+{% extends 'logins/base.html' %}
+{% load static %}
+
+{% block title %}Reports — Task Tracker{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<div class="d-flex flex-wrap gap-3 mb-4">
+  <div>
+    <label class="form-label mb-0 small-muted">From</label>
+    <input id="fromDate" type="date" class="form-control form-control-sm">
+  </div>
+  <div>
+    <label class="form-label mb-0 small-muted">To</label>
+    <input id="toDate" type="date" class="form-control form-control-sm">
+  </div>
+  <div>
+    <label class="form-label mb-0 small-muted">Group by</label>
+    <select id="groupBy" class="form-select form-select-sm">
+      <option value="day">Day</option>
+      <option value="week">Week</option>
+      <option value="month">Month</option>
+    </select>
+  </div>
+  <div class="d-flex align-items-end">
+    <button id="applyFilters" class="btn btn-add btn-sm">Apply</button>
+    <button id="resetFilters" class="btn btn-outline-secondary btn-sm ms-2">Reset</button>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card p-3">
+      <h5 class="mb-3">Status Distribution</h5>
+      <canvas id="statusChart"></canvas>
+      <p class="small-muted mt-2">Counts of issues by status in the selected date range.</p>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card p-3">
+      <h5 class="mb-3">Issues Created Over Time</h5>
+      <canvas id="timelineChart"></canvas>
+      <p class="small-muted mt-2">Number of issues created per chosen period.</p>
+    </div>
+  </div>
+</div>
+<!-- Tag Chart -->
+<div class="row g-4 mt-1">
+  <div class="col-12">
+    <div class="card p-3">
+      <h5 class="mb-3">Tag Distribution</h5>
+      <canvas id="tagChart"></canvas>
+      <p class="small-muted mt-2">
+        Number of issues grouped by assigned TAG.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+
+<script>
+  <!--newchart->
+    function buildAggregates({from=null, to=null, groupBy='day'}) {
+  const countsByStatus = {};
+  const timelineCounts = {};
+  const tagCounts = {};
+
+  issues.forEach(issue => {
+    const created = parseDate(issue.created_at);
+    if (!created) return;
+    if (from && created < from) return;
+    if (to && created > to) return;
+
+    // Status count
+    const status = (issue.status || 'open').toLowerCase();
+    countsByStatus[status] = (countsByStatus[status] || 0) + 1;
+
+    // Timeline bucket
+    let key;
+    if (groupBy === 'day') key = formatDay(created);
+    else if (groupBy === 'week') key = startOfWeek(created);
+    else key = startOfMonth(created);
+    timelineCounts[key] = (timelineCounts[key] || 0) + 1;
+
+    // TAG count (TAG may be comma-separated)
+    if (issue.tag) {
+      issue.tag.split(',').map(t => t.trim()).forEach(t => {
+        if (t) tagCounts[t] = (tagCounts[t] || 0) + 1;
+      });
+    }
+  });
+
+  const timelineKeys = Object.keys(timelineCounts)
+    .sort((a, b) => new Date(a) - new Date(b));
+
+  return { countsByStatus, timelineCounts, timelineKeys, tagCounts };
+}
+
+let tagChart = null;
+
+function renderTagChart(tagCounts) {
+  const labels = Object.keys(tagCounts);
+  const data = Object.values(tagCounts);
+
+  const colors = [
+    '#4f46e5', '#06b6d4', '#f59e0b', '#10b981',
+    '#ef4444', '#8b5cf6', '#6366f1', '#14b8a6'
+  ];
+
+  const ctx = document.getElementById('tagChart').getContext('2d');
+  if (tagChart) tagChart.destroy();
+
+  tagChart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: colors.slice(0, labels.length),
+        hoverOffset: 8,
+        borderWidth: 0
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { position: 'bottom' }
+      }
+    }
+  });
+}
+<!----render new graph by tag-->
+function applyAndRender() {
+  const fromVal = document.getElementById('fromDate').value;
+  const toVal = document.getElementById('toDate').value;
+  const groupBy = document.getElementById('groupBy').value;
+
+  const from = fromVal ? parseDate(fromVal) : null;
+  const to = toVal ? (() => { const d = parseDate(toVal); d.setHours(23,59,59,999); return d; })() : null;
+
+  const { countsByStatus, timelineCounts, timelineKeys, tagCounts } =
+    buildAggregates({ from, to, groupBy });
+
+  renderStatusChart(countsByStatus);
+  renderTimelineChart(timelineCounts, timelineKeys);
+  renderTagChart(tagCounts);   // ← NEW
+}
+const issues = {{ issues_json|safe }};
+
+function parseDate(s){if(!s)return null;const d=new Date(s);if(!isNaN(d))return d;const p=s.split('-').map(x=>parseInt(x,10));return new Date(p[0],p[1]-1,p[2]);}
+function formatDay(d){return d.toISOString().slice(0,10);}
+function startOfWeek(d){const c=new Date(d);const day=c.getDay();const diff=c.getDate()-day+(day===0?-6:1);c.setDate(diff);return formatDay(c);}
+function startOfMonth(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;}
+
+function buildAggregates({from=null,to=null,groupBy='day'}){
+  const countsByStatus={},timelineCounts={};
+  issues.forEach(issue=>{
+    const created=parseDate(issue.created_at);
+    if(!created)return;
+    if(from&&created<from)return;
+    if(to&&created>to)return;
+    const status=(issue.status||'open').toLowerCase();
+    countsByStatus[status]=(countsByStatus[status]||0)+1;
+    let key;
+    if(groupBy==='day')key=formatDay(created);
+    else if(groupBy==='week')key=startOfWeek(created);
+    else key=startOfMonth(created);
+    timelineCounts[key]=(timelineCounts[key]||0)+1;
+  });
+  const timelineKeys=Object.keys(timelineCounts).sort((a,b)=>new Date(a)-new Date(b));
+  return {countsByStatus,timelineCounts,timelineKeys};
+}
+
+let statusChart=null,timelineChart=null;
+
+function renderStatusChart(counts){
+  const labels=Object.keys(counts).map(s=>s.replace('_',' ').toUpperCase());
+  const data=Object.values(counts);
+  const colors=['#4f46e5','#06b6d4','#f59e0b','#10b981','#ef4444','#8b5cf6'];
+  const ctx=document.getElementById('statusChart').getContext('2d');
+  if(statusChart)statusChart.destroy();
+  statusChart=new Chart(ctx,{
+    type:'pie',
+    data:{labels,datasets:[{data,backgroundColor:colors.slice(0,labels.length),hoverOffset:8,borderWidth:0}]},
+    options:{plugins:{legend:{position:'bottom'}}}
+  });
+}
+
+function renderTimelineChart(timelineCounts,keys){
+  const labels=keys,data=keys.map(k=>timelineCounts[k]||0);
+  const ctx=document.getElementById('timelineChart').getContext('2d');
+  if(timelineChart)timelineChart.destroy();
+  timelineChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets:[{label:'Issues created',data,backgroundColor:'#667eea',borderRadius:6}]},
+    options:{scales:{x:{ticks:{maxRotation:0}},y:{beginAtZero:true,precision:0}},plugins:{legend:{display:false}}}
+  });
+}
+
+function applyAndRender(){
+  const fromVal=document.getElementById('fromDate').value;
+  const toVal=document.getElementById('toDate').value;
+  const groupBy=document.getElementById('groupBy').value;
+  const from=fromVal?parseDate(fromVal):null;
+  const to=toVal?(()=>{const d=parseDate(toVal);d.setHours(23,59,59,999);return d;})():null;
+  const {countsByStatus,timelineCounts,timelineKeys}=buildAggregates({from,to,groupBy});
+  renderStatusChart(countsByStatus);
+  renderTimelineChart(timelineCounts,timelineKeys);
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  applyAndRender();
+  document.getElementById('applyFilters').addEventListener('click',applyAndRender);
+  document.getElementById('resetFilters').addEventListener('click',()=>{
+    document.getElementById('fromDate').value='';
+    document.getElementById('toDate').value='';
+    document.getElementById('groupBy').value='day';
+    applyAndRender();
+  });
+});
+</script>
+{% endblock %}

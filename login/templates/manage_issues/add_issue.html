@@ -1,0 +1,169 @@
+{% extends "logins/base.html" %}
+{% load static %}
+
+{% block title %}Add New Issue{% endblock %}
+
+{% block extra_head %}
+<style>
+  .main-content {
+    flex-grow: 1;
+    padding: 2rem;
+  }
+
+  .tag {
+    display: inline-block;
+    background: #667eea;
+    color: white;
+    padding: 3px 8px;
+    margin: 3px;
+    border-radius: 6px;
+  }
+  .tag .remove {
+    margin-left: 5px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+
+  .form-card {
+    background: #fff;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    padding: 2rem;
+    max-width: 600px;
+    margin: auto;
+  }
+
+  .btn-save {
+    background-color: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+  }
+  .btn-save:hover {
+    background-color: #5465d1;
+  }
+
+  #tag-input {
+    min-width: 120px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<h2 class="fw-semibold mb-4">Add New Issue</h2>
+
+<div class="form-card">
+  <!-- 🔥 FILE UPLOAD MUST HAVE enctype="multipart/form-data" -->
+  <form method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <!-- Title -->
+    <div class="mb-3">
+      <label class="form-label">Title</label>
+      <input type="text" name="title" class="form-control" required placeholder="Enter issue title">
+    </div>
+
+    <!-- Description -->
+    <div class="mb-3">
+      <label class="form-label">Description</label>
+      <textarea name="description" rows="4" class="form-control" required placeholder="Describe the issue..."></textarea>
+    </div>
+
+    <!-- Status -->
+    <div class="mb-3">
+      <label class="form-label">Status</label>
+      <select name="status" class="form-select">
+        <option value="open">Open</option>
+        <option value="in_progress">In Progress</option>
+        <option value="blocked">Blocked</option>
+        <option value="closed">Closed</option>
+      </select>
+    </div>
+
+    <!-- Due Date -->
+    <div class="mb-3">
+      <label class="form-label">Due Date</label>
+      <input type="date" name="due_date" class="form-control">
+    </div>
+
+    <!-- Tags -->
+    <div class="mb-3">
+      <label class="form-label">Tags</label>
+
+      <div id="tag-container" class="form-control"
+           style="min-height: 45px; display: flex; flex-wrap: wrap; align-items: center;">
+
+          <div id="tag-list" style="display: flex; flex-wrap: wrap;"></div>
+
+          <input id="tag-input" type="text" class="border-0"
+                 style="outline: none; flex-grow: 1;" placeholder="Press Enter to add tag">
+      </div>
+
+      <input type="hidden" name="tags" id="tags-hidden">
+    </div>
+
+    <!-- File Upload -->
+    <div class="mb-3">
+      <label class="form-label">Attach Documents</label>
+      <input type="file" name="documents" class="form-control" multiple>
+      <small class="text-muted">You can upload multiple files.</small>
+    </div>
+
+    <!-- Buttons -->
+    <div class="d-flex justify-content-between mt-4">
+      <a href="{% url 'manage_issues' %}" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-save">Save Issue</button>
+    </div>
+
+  </form>
+</div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+let tags = [];
+
+const input = document.getElementById("tag-input");
+const hidden = document.getElementById("tags-hidden");
+const tagList = document.getElementById("tag-list");
+
+// Add tag on Enter
+input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+        e.preventDefault();
+
+        let value = input.value.trim();
+
+        if (value !== "" && !tags.includes(value)) {
+            tags.push(value);
+            updateTags();
+        }
+
+        input.value = "";
+    }
+});
+
+// Render tags visually
+function updateTags() {
+    tagList.innerHTML = "";
+
+    tags.forEach(tag => {
+        let chip = document.createElement("span");
+        chip.classList.add("tag");
+        chip.innerHTML = `${tag} <span class="remove" onclick="removeTag('${tag}')">×</span>`;
+        tagList.appendChild(chip);
+    });
+
+    hidden.value = tags.join(",");
+}
+
+// Remove tag
+function removeTag(tag) {
+    tags = tags.filter(t => t !== tag);
+    updateTags();
+}
+</script>
+{% endblock extra_js %}

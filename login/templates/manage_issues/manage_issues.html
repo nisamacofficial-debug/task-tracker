@@ -1,0 +1,544 @@
+{% extends "logins/base.html" %}
+{% load static %}
+
+{% block title %}Manage Issues — Task Tracker{% endblock %}
+
+{% block extra_head %}
+<style>
+
+.card-elev {
+  background: var(--panel-bg);
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.04);
+  padding: 16px;
+}
+
+/* Controls row */
+.controls-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: end;
+}
+
+.controls-row .clear-col {
+  justify-self: end;
+  display: flex;
+  gap: .5rem;
+  align-items: center;
+}
+
+.issues-table { margin-top: 12px; }
+.issues-table table { background: var(--panel-bg); border-radius: 10px; overflow: hidden; }
+.issues-table th { background: var(--brand); color: #fff; }
+.tag-cell { font-size: .9rem; color: var(--muted); }
+
+/* Inline editing */
+.view-value { display: inline-block; min-width: 40px; }
+.edit-input { min-width: 100px; max-width: 100%; }
+.edit-input.d-none { display: none !important; }
+
+/* Comments drawer */
+.comments-panel {
+  position: fixed !important;
+  top: 0 !important;
+  right: -420px !important;
+  width: 420px;
+  height: 100vh !important;
+  background: #fff;
+  box-shadow: -6px 0 30px rgba(0,0,0,0.06);
+  padding: 18px;
+  transition: right .28s ease;
+  z-index: 99999 !important;
+  overflow-y: auto;
+}
+.comments-panel.active { right: 0 !important; }
+.comment-box { border:1px solid #eee; border-radius:10px; padding:10px 12px; margin-bottom:10px; background:#fbfdff; }
+.close-panel { position:absolute; top:10px; right:12px; border:none; background:transparent; font-size:20px; color:#444; }
+
+.footer {
+  text-align: center;
+  margin-top: 2rem;
+  font-size: 13px;
+  color: #888;
+}
+
+@media (max-width: 900px) {
+  .comments-panel { width: 100%; right: -100%; }
+  .comments-panel.active { right: 0; left: 0; }
+}
+
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Hidden CSRF token so JavaScript can use it -->
+<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="m-0">Manage Issues</h2>
+
+  <div class="d-flex gap-2">
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+        Export
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="{% url 'export_issues_excel' %}">📄 Export to Excel (.xlsx)</a></li>
+        <li><a class="dropdown-item" href="{% url 'export_issues_csv' %}">📑 Export to CSV (.csv)</a></li>
+      </ul>
+    </div>
+
+    <a href="{% url 'add_issue' %}" class="btn" style="background:var(--brand); color:#fff; border-radius:8px; padding:.5rem .9rem;">
+      + Add New Issue
+    </a>
+  </div>
+</div>
+
+<div class="card-elev">
+  <div class="controls-row">
+    <div>
+      <label class="form-label mb-0 small-muted">Status</label>
+      <select id="statusFilter" class="form-select form-select-sm">
+        <option value="">All</option>
+        <option value="open">Open</option>
+        <option value="in_progress">In Progress</option>
+        <option value="blocked">Blocked</option>
+        <option value="closed">Closed</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="form-label mb-0 small-muted">Tag</label>
+      <select id="tagFilter" class="form-select form-select-sm">
+        <option value="">All</option>
+        {% for tag in tags %}
+        <option value="{{ tag.name }}">{{ tag.name|title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div style="min-width:220px;">
+      <label class="form-label mb-0 small-muted">Search</label>
+      <input id="searchInput" type="search" class="form-control form-control-sm" placeholder="title or description">
+    </div>
+
+    <div class="clear-col">
+      <button id="clearFilters" class="btn btn-outline-secondary btn-sm">Clear</button>
+    </div>
+  </div>
+</div>
+
+<div class="issues-table card-elev mt-3">
+  <div class="table-responsive">
+    <div class="mb-3 d-flex gap-2">
+      <button id="deleteSelectedBtn" class="btn btn-danger btn-sm">Delete Selected</button>
+      <button id="deleteAllBtn" class="btn btn-outline-danger btn-sm">Delete All</button>
+    </div>
+
+    <table class="table align-middle mb-0" id="issuesTable">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="selectAll"></th>
+          <th>ID</th>
+          <th>Title</th>
+          <th>Description</th>
+          <th>Status</th>
+          <th>Due Date</th>
+          <th>Tags</th>
+          <th>Created By</th>
+          <th>Created At</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for issue in issues %}
+        <tr data-issue-id="{{ issue.id }}">
+          <td><input type="checkbox" class="row-check" value="{{ issue.id }}"></td>
+          <td>{{ issue.id }}</td>
+          <td class="title-cell">{{ issue.title }}</td>
+          <td class="desc-cell">{{ issue.description|truncatechars:60 }}</td>
+          <td class="status-cell" data-issue-id="{{ issue.id }}">
+  <div class="d-flex align-items-center gap-2">
+    <span class="status-text">
+      {% if issue.status == 'closed' %}
+        <span class="badge bg-success">Closed</span>
+      {% elif issue.status == 'in_progress' %}
+        <span class="badge bg-warning text-dark">In Progress</span>
+      {% elif issue.status == 'blocked' %}
+        <span class="badge bg-danger">Blocked</span>
+      {% else %}
+        <span class="badge bg-secondary">Open</span>
+      {% endif %}
+    </span>
+
+    <select class="status-select form-select form-select-sm d-none" aria-label="Status select">
+      <option value="open" {% if issue.status == 'open' %}selected{% endif %}>Open</option>
+      <option value="in_progress" {% if issue.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+      <option value="blocked" {% if issue.status == 'blocked' %}selected{% endif %}>Blocked</option>
+      <option value="closed" {% if issue.status == 'closed' %}selected{% endif %}>Closed</option>
+    </select>
+  </div>
+</td>
+
+<td class="editable-field" data-issue-id="{{ issue.id }}" data-field="due_date">
+    <span class="view-value">
+        {% if issue.due_date %}{{ issue.due_date|date:"Y-m-d" }}{% else %}—{% endif %}
+    </span>
+    <input type="date"
+           class="edit-input form-control form-control-sm d-none"
+           value="{% if issue.due_date %}{{ issue.due_date|date:'Y-m-d' }}{% endif %}">
+</td>
+
+<td class="editable-field" data-issue-id="{{ issue.id }}" data-field="tag">
+    <span class="view-value">
+        {% if issue.tag %}{{ issue.tag }}{% else %}—{% endif %}
+    </span>
+    <input type="text"
+           class="edit-input form-control form-control-sm d-none"
+           value="{% if issue.tag %}{{ issue.tag }}{% endif %}">
+</td>
+<td>{{ issue.created_by.username }}</td>
+          <td>{{ issue.created_at|date:"Y-m-d H:i" }}</td>
+
+          <td class="d-flex gap-1">
+            <button class="btn btn-sm btn-outline-info view-comments" data-issue-id="{{ issue.id }}">💬</button>
+            <a href="{% url 'edit_issue' issue.id %}" class="btn btn-sm btn-outline-primary">✏️</a>
+            <button class="btn btn-sm btn-outline-danger delete-issue" data-issue-id="{{ issue.id }}">🗑️</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Comments Drawer -->
+<aside class="comments-panel" id="commentsPanel" aria-hidden="true">
+  <button class="close-panel" id="closePanel">&times;</button>
+  <h5 class="mb-2">Comments</h5>
+  <div id="commentsList" class="mb-3 text-muted">Select an issue to view comments.</div>
+
+  <form id="commentForm" class="mt-2 d-none">
+    <div class="mb-3">
+      <textarea id="newComment" rows="3" class="form-control" placeholder="Add a comment..."></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary w-100">Post Comment</button>
+  </form>
+</aside>
+
+<div class="footer">
+  Powered by <strong>Nisamudheen</strong> | Contact: <a href="mailto:nisamac2121@gmail.com">nisamac2121@gmail.com</a>
+</div>
+
+{% endblock content %}
+
+
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+// ===============================
+// COMMENTS PANEL HANDLING
+// ===============================
+
+const commentsPanel = document.getElementById("commentsPanel");
+const commentsList = document.getElementById("commentsList");
+const commentForm = document.getElementById("commentForm");
+const newCommentInput = document.getElementById("newComment");
+const closePanel = document.getElementById("closePanel");
+
+let currentIssueId = null;
+
+// Open comments drawer
+document.querySelectorAll(".view-comments").forEach(btn => {
+  btn.addEventListener("click", function () {
+
+    currentIssueId = this.dataset.issueId;
+
+    commentsPanel.classList.add("active");
+    commentsList.innerHTML = "Loading...";
+
+    fetch(`/issues/${currentIssueId}/comments/`)
+      .then(res => res.json())
+      .then(data => {
+        if (!data.comments || data.comments.length === 0) {
+          commentsList.innerHTML = "<p class='text-muted'>No comments yet.</p>";
+        } else {
+          commentsList.innerHTML = data.comments.map(
+            c => `
+            <div class="comment-box">
+              <strong>${c.user}</strong>
+              <small class="text-muted" style="font-size: 11px;">${c.created_at}</small>
+              <p class="mt-1 mb-0">${c.text}</p>
+            </div>`
+          ).join("");
+        }
+        commentForm.classList.remove("d-none");
+      });
+  });
+});
+
+// Close drawer
+closePanel.addEventListener("click", () => {
+  commentsPanel.classList.remove("active");
+  commentForm.classList.add("d-none");
+  newCommentInput.value = "";
+});
+
+// Post comment
+commentForm.addEventListener("submit", function (e) {
+  e.preventDefault();
+
+  const text = newCommentInput.value.trim();
+  if (!text) return;
+
+  fetch(`/add-comment/${currentIssueId}/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": csrftoken
+    },
+    body: JSON.stringify({ text })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      commentsList.innerHTML += `
+        <div class="comment-box">
+          <strong>${data.comment.user}</strong>
+          <small class="text-muted" style="font-size: 11px;">${data.comment.created_at}</small>
+          <p class="mt-1 mb-0">${data.comment.text}</p>
+        </div>`;
+      newCommentInput.value = "";
+    } else {
+      alert(data.error || "Failed to post comment.");
+    }
+  });
+});
+
+// ===============================
+// INLINE STATUS EDITING (dblclick -> edit -> save)
+// ===============================
+
+document.querySelectorAll(".status-cell").forEach(cell => {
+  // dblclick to edit
+  cell.addEventListener("dblclick", function () {
+    const selectBox = this.querySelector(".status-select");
+    const textSpan = this.querySelector(".status-text");
+
+    if (!selectBox) return;
+
+    textSpan.classList.add("d-none");
+    selectBox.classList.remove("d-none");
+    selectBox.focus();
+  });
+
+  // click outside the select should cancel editing (optional)
+  cell.addEventListener("click", function (e) {
+    // if click target is the cell itself (not the select), close any open select
+    const selectBox = this.querySelector(".status-select");
+    if (!selectBox) return;
+    if (e.target === this || e.target === this.querySelector(".status-text")) {
+      // do nothing here — keep for future improvements
+    }
+  });
+});
+
+// Handle when user changes the status
+document.addEventListener("change", function (e) {
+  if (!e.target.classList.contains("status-select")) return;
+
+  const select = e.target;
+  const td = select.closest(".status-cell");
+  if (!td) return;
+
+  const issueId = td.dataset.issueId;
+  const newStatus = select.value;
+
+  fetch(`/update-status/${issueId}/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": csrftoken
+    },
+    body: JSON.stringify({ status: newStatus })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data && data.success) {
+      const textSpan = td.querySelector(".status-text");
+
+      // build new badge HTML (match your styling)
+      let badgeHtml = "";
+      if (newStatus === "closed") {
+        badgeHtml = `<span class="badge bg-success">Closed</span>`;
+      } else if (newStatus === "in_progress") {
+        badgeHtml = `<span class="badge bg-warning text-dark">In Progress</span>`;
+      } else if (newStatus === "blocked") {
+        badgeHtml = `<span class="badge bg-danger">Blocked</span>`;
+      } else {
+        badgeHtml = `<span class="badge bg-secondary">Open</span>`;
+      }
+
+      textSpan.innerHTML = badgeHtml;
+
+      // hide select, show text
+      textSpan.classList.remove("d-none");
+      select.classList.add("d-none");
+    } else {
+      alert("Failed to update status: " + (data.error || "Unknown error"));
+      // revert UI: hide select and show original text
+      const textSpan = td.querySelector(".status-text");
+      textSpan.classList.remove("d-none");
+      select.classList.add("d-none");
+    }
+  })
+  .catch(err => {
+    console.error("Status update failed:", err);
+    alert("Status update failed due to network error.");
+    // revert UI
+    const textSpan = td.querySelector(".status-text");
+    textSpan.classList.remove("d-none");
+    select.classList.add("d-none");
+  });
+});
+
+// ===============================
+// INLINE EDITING FOR DUE DATE & TAG
+// ===============================
+
+// Open edit input when clicking on a field
+document.querySelectorAll(".editable-field").forEach(cell => {
+    const viewSpan = cell.querySelector(".view-value");
+    const input = cell.querySelector(".edit-input");
+
+    // click → show input
+    cell.addEventListener("click", function () {
+        viewSpan.classList.add("d-none");
+        input.classList.remove("d-none");
+        input.focus();
+    });
+
+    // blur OR Enter key → save value
+    input.addEventListener("blur", function () {
+        saveInlineEdit(cell);
+    });
+
+    input.addEventListener("keyup", function (e) {
+        if (e.key === "Enter") {
+            input.blur(); // triggers save
+        }
+    });
+});
+
+// Function that sends AJAX update
+function saveInlineEdit(cell) {
+    const issueId = cell.dataset.issueId;
+    const field = cell.dataset.field;
+    const input = cell.querySelector(".edit-input");
+    const viewSpan = cell.querySelector(".view-value");
+
+    const newValue = input.value.trim();
+
+    fetch(`/update-field/${issueId}/`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrftoken
+        },
+        body: JSON.stringify({
+            field: field,
+            value: newValue || null
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            viewSpan.textContent = newValue || "—";
+        } else {
+            alert("Failed to update " + field);
+        }
+    })
+    .catch(() => {
+        alert("Network error while updating " + field);
+    })
+    .finally(() => {
+        // restore view state
+        input.classList.add("d-none");
+        viewSpan.classList.remove("d-none");
+    });
+}
+
+// ===============================
+// DELETE SELECTED ISSUES
+// ===============================
+document.getElementById("deleteSelectedBtn").addEventListener("click", function () {
+    const selected = [...document.querySelectorAll(".row-check:checked")].map(cb => cb.value);
+
+    if (selected.length === 0) {
+        alert("No issues selected.");
+        return;
+    }
+
+    if (!confirm(`Delete ${selected.length} selected issues?`)) return;
+
+    fetch("/delete-multiple/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrftoken
+        },
+        body: JSON.stringify({ ids: selected })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            selected.forEach(id => {
+                document.querySelector(`tr[data-issue-id='${id}']`).remove();
+            });
+        } else {
+            alert("Failed to delete selected issues.");
+        }
+    });
+});
+
+// ===============================
+// DELETE ALL ISSUES
+// ===============================
+document.getElementById("deleteAllBtn").addEventListener("click", function () {
+    if (!confirm("Are you sure you want to delete ALL issues? This cannot be undone.")) return;
+
+    fetch("/delete-all/", {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": csrftoken
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            // Clear entire table body
+            document.querySelector("#issuesTable tbody").innerHTML = "";
+        } else {
+            alert("Failed to delete all issues.");
+        }
+    });
+});
+
+// ===============================
+// SELECT ALL CHECKBOX
+// ===============================
+document.getElementById("selectAll").addEventListener("change", function () {
+    document.querySelectorAll(".row-check").forEach(cb => {
+        cb.checked = this.checked;
+    });
+});
+
+</script>
+{% endblock extra_js %}
